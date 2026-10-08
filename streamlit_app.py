@@ -1,32 +1,45 @@
 import streamlit as st
 import yfinance as yf
+import pandas as pd
 import ta
-st.set_page_config(page_title="Gold Bot", layout="wide")
+
+st.set_page_config(page_title="Gold Live Trading Bot - Naveed", layout="wide")
 st.title("Gold Live Trading Bot - Naveed")
-st.markdown("Live BUY / SELL Signals - Abu Dhabi")
-symbol = st.sidebar.selectbox("Symbol", ["GC=F", "XAUUSD=X", "EURUSD=X", "BTC-USD"])
-@st.cache_data(ttl=60)
-def get_data(sym):
-    return yf.download(sym, period="5d", interval="15m", auto_adjust=True)
-df = get_data(symbol)
-df['EMA9'] = ta.trend.ema_indicator(df['Close'], window=9)
-df['EMA21'] = ta.trend.ema_indicator(df['Close'], window=21)
-df['RSI'] = ta.momentum.rsi(df['Close'], window=14)
-df.dropna(inplace=True)
-close = float(df['Close'].iloc[-1])
+st.markdown("Live BUY / SELL Signals - Abu Dhabi - Gulf Time")
+
+symbol = "GC=F"
+df = yf.download(symbol, period="1d", interval="5m")
+
+if len(df) < 50:
+    st.warning("Market data loading, please refresh in 1 min")
+    st.stop()
+
+close = df['Close']
+if isinstance(close, pd.DataFrame):
+    close = close.iloc[:, 0]
+
+df['EMA9'] = ta.trend.ema_indicator(close, window=9)
+df['EMA21'] = ta.trend.ema_indicator(close, window=21)
+df['RSI'] = ta.momentum.rsi(close, window=14)
+
+price = float(close.iloc[-1])
 ema9 = float(df['EMA9'].iloc[-1])
 ema21 = float(df['EMA21'].iloc[-1])
 rsi = float(df['RSI'].iloc[-1])
-if ema9 > ema21 and rsi > 55:
-    signal = "STRONG BUY"
-elif ema9 < ema21 and rsi < 45:
-    signal = "STRONG SELL"
+
+st.metric("GOLD Price", f"${price:.2f}")
+
+col1, col2, col3 = st.columns(3)
+col1.metric("EMA 9", f"{ema9:.2f}")
+col2.metric("EMA 21", f"{ema21:.2f}")
+col3.metric("RSI", f"{rsi:.2f}")
+
+if ema9 > ema21 and rsi > 50 and rsi < 70:
+    st.success("### 🟢 BUY SIGNAL")
+elif ema9 < ema21 and rsi < 50 and rsi > 30:
+    st.error("### 🔴 SELL SIGNAL")
 else:
-    signal = "WAIT"
-c1,c2,c3,c4 = st.columns(4)
-c1.metric("Price", f"${close:.2f}")
-c2.metric("EMA9", f"${ema9:.2f}")
-c3.metric("EMA21", f"${ema21:.2f}")
-c4.metric("RSI", f"{rsi:.2f}")
-st.header(signal)
+    st.info("### 🟡 WAIT SIGNAL")
+
 st.line_chart(df[['Close','EMA9','EMA21']].tail(100))
+st.dataframe(df.tail(10))
